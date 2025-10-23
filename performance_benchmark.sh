@@ -37,15 +37,15 @@ measure_performance() {
     workdir_expanded="${workdir/#\~/$HOME}"
     cd "$workdir_expanded"
     
-    # Use /usr/bin/time for detailed measurements
+    # Use /usr/bin/time for detailed measurements (suppress verbose output)
+    echo "Starting measurement..."
+    # Use /usr/bin/time for detailed measurements (suppress verbose output)
     echo "Starting measurement..."
     /usr/bin/time -f "STATS: Real=%E User=%U System=%S MaxMemory=%MkB CPUUsage=%P" \
-        timeout 600s bash -c "$command" 2>&1 | tee "/tmp/benchmark_${name// /_}.log"
-    
-    local exit_code=${PIPESTATUS[0]}
+        timeout 300s bash -c "$command > /dev/null 2>&1" 2>&1 | grep -E "(STATS:|timeout|error|Error|ERROR)" | tee "/tmp/benchmark_${name// /_}.log"    local exit_code=${PIPESTATUS[0]}
     
     if [ $exit_code -eq 124 ]; then
-        echo -e "${RED}TIMEOUT: Test exceeded 10 minutes${NC}"
+        echo -e "${RED}TIMEOUT: Test exceeded 5 minutes${NC}"
         return 124
     elif [ $exit_code -ne 0 ]; then
         echo -e "${RED}ERROR: Test failed with exit code $exit_code${NC}"
@@ -104,7 +104,7 @@ fi
 cd build && make -j4
 
 echo -e "\n${CYAN}Building CompoundFile project...${NC}"
-cd "$HOME/polytec/rust-cpp-cfb/CompoundFile"
+cd "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp"
 if [ ! -d "build" ]; then
     mkdir build
     cd build
@@ -118,11 +118,11 @@ echo -e "\n${PURPLE}=== PHASE 2: 1GB FILE CREATION BENCHMARKS ===${NC}"
 # Clean up any existing large files
 rm -f "$HOME/polytec/rust-cfb-compound-file-format/large_1gb.cfb"
 rm -f "$HOME/polytec/cfbcpp/build/large_1gb_memory.cfb"  
-rm -f "$HOME/polytec/rust-cpp-cfb/CompoundFile/build/large_1gb_mscompoundfile.cfb"
+rm -f "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp/build/large_1gb_mscompoundfile.cfb"
 
 echo -e "\n${YELLOW}1. Rust Implementation (Native)${NC}"
 measure_performance "Rust 1GB Creation" \
-    "cargo run --release --example create_1gb_cfb" \
+    "cargo run --release --example create_1gb_cfb --quiet" \
     "$HOME/polytec/rust-cfb-compound-file-format"
 
 echo -e "\n${YELLOW}2. C++ cfbcpp Implementation (FFI Wrapper)${NC}"
@@ -133,7 +133,7 @@ measure_performance "cfbcpp 1GB Creation" \
 echo -e "\n${YELLOW}3. C++ CompoundFile Implementation (Translated Headers)${NC}"
 measure_performance "CompoundFile 1GB Creation" \
     "./create_1gb_cfb" \
-    "$HOME/polytec/rust-cpp-cfb/CompoundFile/build"
+    "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp/build"
 
 echo -e "\n${PURPLE}=== PHASE 3: STREAM TRAVERSAL BENCHMARKS ===${NC}"
 
@@ -153,7 +153,7 @@ fi
 echo -e "\n${YELLOW}1. Rust Stream Traversal${NC}"
 if [ -f "large_1gb.cfb" ]; then
     measure_performance "Rust Stream Traversal" \
-        "timeout 300s cargo run --release --example traverse_streams" \
+        "timeout 300s cargo run --release --example traverse_streams --quiet" \
         "$HOME/polytec/rust-cfb-compound-file-format"
 else
     echo "Skipping Rust traversal - no input file available"
@@ -167,13 +167,13 @@ measure_performance "cfbcpp Stream Traversal" \
 echo -e "\n${YELLOW}3. C++ CompoundFile Stream Traversal${NC}"
 measure_performance "CompoundFile Stream Traversal" \
     "./traverse_streams" \
-    "$HOME/polytec/rust-cpp-cfb/CompoundFile/build"
+    "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp/build"
 
 echo -e "\n${PURPLE}=== PHASE 4: STREAM MODIFICATION BENCHMARKS ===${NC}"
 
 echo -e "\n${YELLOW}1. Rust Stream Modification${NC}"
 measure_performance "Rust Stream Modification" \
-    "cargo run --release --example modify_streams" \
+    "cargo run --release --example modify_streams --quiet" \
     "$HOME/polytec/rust-cfb-compound-file-format"
 
 echo -e "\n${YELLOW}2. C++ cfbcpp Stream Modification${NC}"
@@ -184,7 +184,7 @@ measure_performance "cfbcpp Stream Modification" \
 echo -e "\n${YELLOW}3. C++ CompoundFile Stream Modification${NC}"
 measure_performance "CompoundFile Stream Modification" \
     "./modify_streams" \
-    "$HOME/polytec/rust-cpp-cfb/CompoundFile/build"
+    "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp/build"
 
 echo -e "\n${PURPLE}=== PHASE 5: PERFORMANCE SUMMARY ===${NC}"
 
@@ -196,7 +196,7 @@ extract_stats "/tmp/benchmark_CompoundFile_1GB_Creation.log" "CompoundFile (Tran
 echo -e "\n${CYAN}=== Output File Sizes ===${NC}"
 check_file_size "$HOME/polytec/rust-cfb-compound-file-format/large_1gb.cfb" "Rust"
 check_file_size "$HOME/polytec/cfbcpp/build/large_1gb_memory.cfb" "cfbcpp"  
-check_file_size "$HOME/polytec/rust-cpp-cfb/CompoundFile/build/large_1gb_mscompoundfile.cfb" "CompoundFile"
+check_file_size "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp/build/large_1gb_mscompoundfile.cfb" "CompoundFile"
 
 echo -e "\n${CYAN}=== Stream Traversal Performance ===${NC}"
 extract_stats "/tmp/benchmark_Rust_Stream_Traversal.log" "Rust (Native)"
@@ -245,7 +245,7 @@ echo -e "\n${PURPLE}=== GENERATING SUMMARY REPORT ===${NC}"
     echo "## Output File Analysis"
     check_file_size "$HOME/polytec/rust-cfb-compound-file-format/large_1gb.cfb" "- **Rust**:"
     check_file_size "$HOME/polytec/cfbcpp/build/large_1gb_memory.cfb" "- **cfbcpp**:"
-    check_file_size "$HOME/polytec/rust-cpp-cfb/CompoundFile/build/large_1gb_mscompoundfile.cfb" "- **CompoundFile**:"
+    check_file_size "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp/build/large_1gb_mscompoundfile.cfb" "- **CompoundFile**:"
     echo ""
     echo "## Notes"
     echo "- Time format: Real=Wall_Clock_Time User=User_CPU_Time System=System_CPU_Time"
