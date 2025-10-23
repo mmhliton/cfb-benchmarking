@@ -89,12 +89,20 @@ check_file_size() {
 
 echo -e "\n${PURPLE}=== PHASE 1: BUILD ALL PROJECTS ===${NC}"
 
+# Detect workspace root (cross-platform)
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/polytec}"
+if [ ! -d "$WORKSPACE_ROOT" ]; then
+    WORKSPACE_ROOT="$(dirname "$(dirname "$(readlink -f "$0")")")"
+fi
+
+echo -e "\n${CYAN}Using workspace root: $WORKSPACE_ROOT${NC}"
+
 echo -e "\n${CYAN}Building Rust project...${NC}"
-cd "$HOME/polytec/rust-cfb-compound-file-format"
+cd "$WORKSPACE_ROOT/rust-cfb-compound-file-format"
 cargo build --examples --release
 
 echo -e "\n${CYAN}Building cfbcpp project...${NC}"
-cd "$HOME/polytec/cfbcpp"
+cd "$WORKSPACE_ROOT/cfbcpp"
 if [ ! -d "build" ]; then
     mkdir build
     cd build
@@ -103,15 +111,19 @@ if [ ! -d "build" ]; then
 fi
 cd build && make -j4
 
-echo -e "\n${CYAN}Building CompoundFile project...${NC}"
-cd "$HOME/polytec/rust-cpp-cfb/compoundfile-rust-cpp"
-if [ ! -d "build" ]; then
-    mkdir build
-    cd build
-    cmake ..
-    cd ..
+echo -e "\n${CYAN}Building CompoundFile project (Linux only)...${NC}"
+if command -v gcc >/dev/null 2>&1; then
+    cd "$WORKSPACE_ROOT/rust-cpp-cfb/compoundfile-rust-cpp"
+    if [ ! -d "build" ]; then
+        mkdir build
+        cd build
+        cmake ..
+        cd ..
+    fi
+    cd build && make -j4
+else
+    echo -e "${YELLOW}GCC not available - skipping CompoundFile build${NC}"
 fi
-cd build && make -j4
 
 echo -e "\n${PURPLE}=== PHASE 2: 1GB FILE CREATION BENCHMARKS ===${NC}"
 
